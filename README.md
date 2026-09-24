@@ -165,15 +165,4 @@ dotnet run --project src/ECommerce.Api
 - **No Exceptions for Control Flow:** Business rule violations return Domain `Error` objects, mapped to standardized HTTP status codes (e.g., 400, 404, 409) globally.
 - **Async All The Way:** Comprehensive use of asynchronous programming (`Task`, `CancellationToken`) to maximize throughput.
 
----
 
-## 📚 API Documentation
-
-When running locally in the Development environment, Swagger UI is automatically enabled.
-Navigate to `https://localhost:port/swagger` to visually explore, authenticate, and test all API endpoints.
-
----
-
-## 📄 License
-
-This project is licensed under the [MIT License](LICENSE).
