@@ -1,6 +1,10 @@
-using ECommerce.Api.Extensions;
 using ECommerce.Application.Contracts;
-using ECommerce.Application.Interfaces;
+using ECommerce.Application.Features.Categories.Commands.CreateCategory;
+using ECommerce.Application.Features.Categories.Commands.DeleteCategory;
+using ECommerce.Application.Features.Categories.Commands.DeleteCategoryImage;
+using ECommerce.Application.Features.Categories.Commands.UpdateCategory;
+using ECommerce.Application.Features.Categories.Commands.UploadCategoryImage;
+using ECommerce.Application.Features.Categories.Queries.GetAdminCategories;
 using ECommerce.Domain.Constants;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -11,25 +15,18 @@ namespace ECommerce.Api.Controllers;
 /// Admin-only category management endpoints.
 /// All routes require a valid JWT with the Admin role.
 /// </summary>
-[ApiController]
 [Route("api/admin/categories")]
 [Authorize(Roles = Roles.Admin)]
-[Produces("application/json")]
-public sealed class AdminCategoriesController : ControllerBase
+public sealed class AdminCategoriesController : BaseApiController
 {
-    private readonly ICategoryService _categoryService;
-
-    public AdminCategoriesController(ICategoryService categoryService)
-        => _categoryService = categoryService;
-
     /// <summary>Returns all categories including inactive ones.</summary>
     /// <response code="200">Full list of categories.</response>
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<CategoryResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
     {
-        var result = await _categoryService.GetAllForAdminAsync(cancellationToken);
-        return this.Match(result);
+        var result = await Sender.Send(new GetAdminCategoriesQuery(), cancellationToken);
+        return HandleResult(result);
     }
 
     /// <summary>Creates a new category. Slug auto-generated from Name when not provided.</summary>
@@ -42,13 +39,17 @@ public sealed class AdminCategoriesController : ControllerBase
         [FromBody] CreateCategoryRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await _categoryService.CreateAsync(request, cancellationToken);
+        var result = await Sender.Send(new CreateCategoryCommand(request), cancellationToken);
 
-        return this.Match(result, category => 
-            CreatedAtAction(nameof(CategoriesController.GetBySlug), 
-                            "Categories", 
-                            new { slug = category.Slug }, 
-                            category));
+        if (result.IsSuccess)
+        {
+            return CreatedAtAction(nameof(CategoriesController.GetBySlug), 
+                                   "Categories", 
+                                   new { slug = result.Value.Slug }, 
+                                   result.Value);
+        }
+
+        return HandleResult(result);
     }
 
     /// <summary>Updates an existing category by ID.</summary>
@@ -67,8 +68,8 @@ public sealed class AdminCategoriesController : ControllerBase
         [FromBody] UpdateCategoryRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await _categoryService.UpdateAsync(id, request, cancellationToken);
-        return this.Match(result);
+        var result = await Sender.Send(new UpdateCategoryCommand(id, request), cancellationToken);
+        return HandleResult(result);
     }
 
     /// <summary>Soft-deletes a category (sets IsActive = false).</summary>
@@ -85,8 +86,8 @@ public sealed class AdminCategoriesController : ControllerBase
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
-        var result = await _categoryService.DeleteAsync(id, cancellationToken);
-        return this.Match(result);
+        var result = await Sender.Send(new DeleteCategoryCommand(id), cancellationToken);
+        return HandleResult(result);
     }
 
     /// <summary>
@@ -112,8 +113,8 @@ public sealed class AdminCategoriesController : ControllerBase
         [FromForm] UploadCategoryImageRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await _categoryService.UploadImageAsync(id, request, cancellationToken);
-        return this.Match(result);
+        var result = await Sender.Send(new UploadCategoryImageCommand(id, request), cancellationToken);
+        return HandleResult(result);
     }
 
     /// <summary>
@@ -132,7 +133,7 @@ public sealed class AdminCategoriesController : ControllerBase
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
-        var result = await _categoryService.DeleteImageAsync(id, cancellationToken);
-        return this.Match(result);
+        var result = await Sender.Send(new DeleteCategoryImageCommand(id), cancellationToken);
+        return HandleResult(result);
     }
 }

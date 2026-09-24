@@ -1,6 +1,6 @@
-using ECommerce.Api.Extensions;
 using ECommerce.Application.Contracts;
-using ECommerce.Application.Interfaces;
+using ECommerce.Application.Features.Categories.Queries.GetActiveCategories;
+using ECommerce.Application.Features.Categories.Queries.GetCategoryBySlug;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -9,25 +9,17 @@ namespace ECommerce.Api.Controllers;
 /// <summary>
 /// Public read-only category endpoints — no authentication required.
 /// </summary>
-[ApiController]
-[Route("api/categories")]
 [AllowAnonymous]
-[Produces("application/json")]
-public sealed class CategoriesController : ControllerBase
+public sealed class CategoriesController : BaseApiController
 {
-    private readonly ICategoryService _categoryService;
-
-    public CategoriesController(ICategoryService categoryService)
-        => _categoryService = categoryService;
-
     /// <summary>Returns all active categories ordered by SortOrder.</summary>
     /// <response code="200">List of active categories.</response>
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<CategoryResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
     {
-        var result = await _categoryService.GetAllActiveAsync(cancellationToken);
-        return this.Match(result);
+        var result = await Sender.Send(new GetActiveCategoriesQuery(), cancellationToken);
+        return HandleResult(result);
     }
 
     /// <summary>Returns a single active category by its URL slug.</summary>
@@ -40,7 +32,7 @@ public sealed class CategoriesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetBySlug([FromRoute] string slug, CancellationToken cancellationToken)
     {
-        var result = await _categoryService.GetBySlugAsync(slug, cancellationToken);
-        return this.Match(result);
+        var result = await Sender.Send(new GetCategoryBySlugQuery(slug), cancellationToken);
+        return HandleResult(result);
     }
 }

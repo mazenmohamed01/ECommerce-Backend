@@ -37,13 +37,14 @@ public static class InfrastructureServiceExtensions
             .AddGoogleSettings(configuration)
             .AddAuthorizationPolicies()
             .AddRepositories()
-            .AddAuthServices()
             .AddCloudinary(configuration)
             .AddRedisCache(configuration)
             .AddMoyasarSettings(configuration)
             .AddEmailService(configuration)
             .AddMoyasarSettings(configuration)
             .AddN8nIntegration(configuration);
+
+        services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(InfrastructureServiceExtensions).Assembly));
 
         return services;
     }
@@ -166,6 +167,7 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IOrderRepository,        OrderRepository>();
         services.AddScoped<IProcessedWebhookEventRepository, ProcessedWebhookEventRepository>();
         services.AddScoped<IOutboundWebhookEventRepository, OutboundWebhookEventRepository>();
+        services.AddScoped<IUserAddressRepository, UserAddressRepository>();
 
         return services;
     }
@@ -190,19 +192,6 @@ public static class InfrastructureServiceExtensions
     {
         services.Configure<GoogleSettings>(
             configuration.GetSection(GoogleSettings.SectionName));
-
-        return services;
-    }
-
-    private static IServiceCollection AddAuthServices(
-        this IServiceCollection services)
-    {
-        services.AddScoped<IAuthService,      AuthService>();
-        services.AddScoped<IAdminAuthService, AdminAuthService>();
-        services.AddScoped<IUserAddressService, UserAddressService>();
-        services.AddScoped<IProfileService, ProfileService>();
-        services.AddScoped<ICustomerService, CustomerService>();
-        services.AddScoped<IAdminDashboardService, AdminDashboardService>();
 
         return services;
     }

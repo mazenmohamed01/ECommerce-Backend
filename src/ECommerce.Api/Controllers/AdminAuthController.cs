@@ -1,6 +1,5 @@
-using ECommerce.Api.Extensions;
 using ECommerce.Application.Contracts;
-using ECommerce.Application.Interfaces;
+using ECommerce.Application.Features.AdminAuth.Commands.AdminLogin;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ECommerce.Api.Controllers;
@@ -12,14 +11,8 @@ namespace ECommerce.Api.Controllers;
 [ApiController]
 [Route("api/admin/auth")]
 [Produces("application/json")]
-public sealed class AdminAuthController : ControllerBase
+public sealed class AdminAuthController : BaseApiController
 {
-    private readonly IAdminAuthService _adminAuthService;
-
-    public AdminAuthController(IAdminAuthService adminAuthService)
-    {
-        _adminAuthService = adminAuthService;
-    }
 
     /// <summary>
     /// Authenticates an admin user using email and password.
@@ -36,7 +29,7 @@ public sealed class AdminAuthController : ControllerBase
         [FromBody] LoginRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await _adminAuthService.LoginAsync(request, cancellationToken);
-        return this.Match(result);
+        var result = await Sender.Send(new AdminLoginCommand(request), cancellationToken);
+        return HandleResult(result);
     }
 }

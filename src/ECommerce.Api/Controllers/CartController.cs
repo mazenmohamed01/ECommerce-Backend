@@ -1,7 +1,10 @@
 using System.Security.Claims;
-using ECommerce.Api.Extensions;
 using ECommerce.Application.Contracts;
-using ECommerce.Application.Interfaces;
+using ECommerce.Application.Features.Carts.Commands.AddItemToCart;
+using ECommerce.Application.Features.Carts.Commands.ClearCart;
+using ECommerce.Application.Features.Carts.Commands.RemoveItemFromCart;
+using ECommerce.Application.Features.Carts.Commands.UpdateCartItemQuantity;
+using ECommerce.Application.Features.Carts.Queries.GetCart;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,19 +14,9 @@ namespace ECommerce.Api.Controllers;
 /// Customer cart endpoints.
 /// Strictly restricted to users with the Customer role.
 /// </summary>
-[ApiController]
-[Route("api/cart")]
 [Authorize(Roles = ECommerce.Domain.Constants.Roles.Customer)]
-[Produces("application/json")]
-public sealed class CartController : ControllerBase
+public sealed class CartController : BaseApiController
 {
-    private readonly ICartService _cartService;
-
-    public CartController(ICartService cartService)
-    {
-        _cartService = cartService;
-    }
-
     private string GetCustomerId()
     {
         return User.FindFirst(ClaimTypes.NameIdentifier)?.Value
@@ -40,8 +33,8 @@ public sealed class CartController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetCart(CancellationToken cancellationToken)
     {
-        var result = await _cartService.GetCartAsync(GetCustomerId(), cancellationToken);
-        return this.Match(result);
+        var result = await Sender.Send(new GetCartQuery(GetCustomerId()), cancellationToken);
+        return HandleResult(result);
     }
 
     /// <summary>
@@ -61,8 +54,8 @@ public sealed class CartController : ControllerBase
         [FromBody] AddCartItemRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await _cartService.AddItemAsync(GetCustomerId(), request, cancellationToken);
-        return this.Match(result);
+        var result = await Sender.Send(new AddItemToCartCommand(GetCustomerId(), request), cancellationToken);
+        return HandleResult(result);
     }
 
     /// <summary>
@@ -84,8 +77,8 @@ public sealed class CartController : ControllerBase
         [FromBody] UpdateCartItemRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await _cartService.UpdateItemQuantityAsync(GetCustomerId(), id, request, cancellationToken);
-        return this.Match(result);
+        var result = await Sender.Send(new UpdateCartItemQuantityCommand(GetCustomerId(), id, request), cancellationToken);
+        return HandleResult(result);
     }
 
     /// <summary>
@@ -102,8 +95,8 @@ public sealed class CartController : ControllerBase
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
-        var result = await _cartService.RemoveItemAsync(GetCustomerId(), id, cancellationToken);
-        return this.Match(result);
+        var result = await Sender.Send(new RemoveItemFromCartCommand(GetCustomerId(), id), cancellationToken);
+        return HandleResult(result);
     }
 
     /// <summary>
@@ -115,12 +108,11 @@ public sealed class CartController : ControllerBase
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> ClearCart(CancellationToken cancellationToken)
     {
-        var result = await _cartService.ClearCartAsync(GetCustomerId(), cancellationToken);
+        var result = await Sender.Send(new ClearCartCommand(GetCustomerId()), cancellationToken);
         
-        // Return 204 No Content for successful clear operation since Result doesn't have a value
         if (result.IsSuccess)
             return NoContent();
             
-        return this.Match(result);
+        return HandleResult(result);
     }
 }

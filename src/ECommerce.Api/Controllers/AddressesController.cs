@@ -1,93 +1,66 @@
 using ECommerce.Application.Contracts.Addresses;
-using ECommerce.Application.Interfaces;
-using ECommerce.Domain.Constants;
+using ECommerce.Application.Features.UserAddresses.Commands.CreateAddress;
+using ECommerce.Application.Features.UserAddresses.Commands.DeleteAddress;
+using ECommerce.Application.Features.UserAddresses.Commands.SetDefaultAddress;
+using ECommerce.Application.Features.UserAddresses.Commands.UpdateAddress;
+using ECommerce.Application.Features.UserAddresses.Queries.GetAddressById;
+using ECommerce.Application.Features.UserAddresses.Queries.GetUserAddresses;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 
 namespace ECommerce.Api.Controllers;
 
-[ApiController]
-[Route("api/[controller]")]
-[Authorize] // Only authenticated users can manage their addresses
-public class AddressesController : ControllerBase
+[Authorize]
+public class AddressesController : BaseApiController
 {
-    private readonly IUserAddressService _userAddressService;
-
-    public AddressesController(IUserAddressService userAddressService)
-    {
-        _userAddressService = userAddressService;
-    }
-
     private string UserId => User.FindFirstValue(ClaimTypes.NameIdentifier)!;
 
     [HttpGet]
     public async Task<ActionResult<IEnumerable<AddressDto>>> GetUserAddresses(CancellationToken cancellationToken)
     {
-        var addresses = await _userAddressService.GetUserAddressesAsync(UserId, cancellationToken);
-        return Ok(addresses);
+        var result = await Sender.Send(new GetUserAddressesQuery(UserId), cancellationToken);
+        return HandleResult(result);
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult<AddressDto>> GetAddressById(string id, CancellationToken cancellationToken)
+    public async Task<ActionResult<AddressDto>> GetAddressById(Guid id, CancellationToken cancellationToken)
     {
-        try
-        {
-            var address = await _userAddressService.GetAddressByIdAsync(id, UserId, cancellationToken);
-            return Ok(address);
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound();
-        }
+        var result = await Sender.Send(new GetAddressByIdQuery(id, UserId), cancellationToken);
+        return HandleResult(result);
     }
 
     [HttpPost]
     public async Task<ActionResult<AddressDto>> CreateAddress([FromBody] CreateAddressRequest request, CancellationToken cancellationToken)
     {
-        var address = await _userAddressService.CreateAddressAsync(UserId, request, cancellationToken);
-        return CreatedAtAction(nameof(GetAddressById), new { id = address.Id }, address);
+        var result = await Sender.Send(new CreateAddressCommand(UserId, request), cancellationToken);
+        
+        if (result.IsSuccess)
+        {
+            return CreatedAtAction(nameof(GetAddressById), new { id = result.Value.Id }, result.Value);
+        }
+
+        return HandleResult(result);
     }
 
     [HttpPut("{id}")]
-    public async Task<ActionResult<AddressDto>> UpdateAddress(string id, [FromBody] UpdateAddressRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<AddressDto>> UpdateAddress(Guid id, [FromBody] UpdateAddressRequest request, CancellationToken cancellationToken)
     {
-        try
-        {
-            var address = await _userAddressService.UpdateAddressAsync(id, UserId, request, cancellationToken);
-            return Ok(address);
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound();
-        }
+        var result = await Sender.Send(new UpdateAddressCommand(id, UserId, request), cancellationToken);
+        return HandleResult(result);
     }
 
     [HttpDelete("{id}")]
-    public async Task<ActionResult> DeleteAddress(string id, CancellationToken cancellationToken)
+    public async Task<ActionResult> DeleteAddress(Guid id, CancellationToken cancellationToken)
     {
-        try
-        {
-            await _userAddressService.DeleteAddressAsync(id, UserId, cancellationToken);
-            return NoContent();
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound();
-        }
+        var result = await Sender.Send(new DeleteAddressCommand(id, UserId), cancellationToken);
+        return HandleResult(result);
     }
 
     [HttpPut("{id}/set-default")]
-    public async Task<ActionResult> SetDefaultAddress(string id, CancellationToken cancellationToken)
+    public async Task<ActionResult> SetDefaultAddress(Guid id, CancellationToken cancellationToken)
     {
-        try
-        {
-            await _userAddressService.SetDefaultAddressAsync(id, UserId, cancellationToken);
-            return NoContent();
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound();
-        }
+        var result = await Sender.Send(new SetDefaultAddressCommand(id, UserId), cancellationToken);
+        return HandleResult(result);
     }
 }

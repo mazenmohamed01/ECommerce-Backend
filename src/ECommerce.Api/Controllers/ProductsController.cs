@@ -1,7 +1,6 @@
-using ECommerce.Api.Extensions;
 using ECommerce.Application.Contracts;
-using ECommerce.Application.Interfaces;
-using FluentValidation;
+using ECommerce.Application.Features.Products.Queries.GetProductBySlug;
+using ECommerce.Application.Features.Products.Queries.SearchProducts;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,23 +10,9 @@ namespace ECommerce.Api.Controllers;
 /// Public product browsing endpoints — no authentication required.
 /// Only returns active, non-deleted products.
 /// </summary>
-[ApiController]
-[Route("api/products")]
 [AllowAnonymous]
-[Produces("application/json")]
-public sealed class ProductsController : ControllerBase
+public sealed class ProductsController : BaseApiController
 {
-    private readonly IProductService                    _productService;
-    private readonly IValidator<ProductSearchRequest>   _searchValidator;
-
-    public ProductsController(
-        IProductService                   productService,
-        IValidator<ProductSearchRequest>  searchValidator)
-    {
-        _productService  = productService;
-        _searchValidator = searchValidator;
-    }
-
     /// <summary>
     /// Searches and browses products with optional filtering, sorting, and pagination.
     /// Only active products are returned.
@@ -41,12 +26,8 @@ public sealed class ProductsController : ControllerBase
         [FromQuery] ProductSearchRequest request,
         CancellationToken cancellationToken)
     {
-        var validation = await _searchValidator.ValidateAsync(request, cancellationToken);
-        if (!validation.IsValid)
-            throw new ValidationException(validation.Errors);
-
-        var result = await _productService.SearchAsync(request, adminView: false, cancellationToken);
-        return this.Match(result);
+        var result = await Sender.Send(new SearchProductsQuery(request, AdminView: false), cancellationToken);
+        return HandleResult(result);
     }
 
     /// <summary>Returns full product details by URL slug. Only active products are returned.</summary>
@@ -61,7 +42,7 @@ public sealed class ProductsController : ControllerBase
         [FromRoute] string slug,
         CancellationToken cancellationToken)
     {
-        var result = await _productService.GetBySlugAsync(slug, cancellationToken);
-        return this.Match(result);
+        var result = await Sender.Send(new GetProductBySlugQuery(slug), cancellationToken);
+        return HandleResult(result);
     }
 }

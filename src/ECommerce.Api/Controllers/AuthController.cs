@@ -1,6 +1,11 @@
-using ECommerce.Api.Extensions;
 using ECommerce.Application.Contracts;
-using ECommerce.Application.Interfaces;
+using ECommerce.Application.Features.Identity.Commands.Register;
+using ECommerce.Application.Features.Identity.Commands.Login;
+using ECommerce.Application.Features.Identity.Commands.GoogleLogin;
+using ECommerce.Application.Features.Identity.Commands.ForgotPassword;
+using ECommerce.Application.Features.Identity.Commands.ResetPassword;
+using ECommerce.Application.Features.Identity.Commands.RefreshToken;
+using ECommerce.Application.Features.Identity.Queries.GetProfile;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -15,14 +20,8 @@ namespace ECommerce.Api.Controllers;
 [ApiController]
 [Route("api/auth")]
 [Produces("application/json")]
-public sealed class AuthController : ControllerBase
+public sealed class AuthController : BaseApiController
 {
-    private readonly IAuthService _authService;
-
-    public AuthController(IAuthService authService)
-    {
-        _authService = authService;
-    }
 
     /// <summary>Registers a new customer using email and password.</summary>
     /// <response code="200">Registration successful. Returns access token and user profile.</response>
@@ -36,8 +35,8 @@ public sealed class AuthController : ControllerBase
         [FromBody] RegisterRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await _authService.RegisterAsync(request, cancellationToken);
-        return this.Match(result);
+        var result = await Sender.Send(new RegisterCommand(request), cancellationToken);
+        return HandleResult(result);
     }
 
     /// <summary>Authenticates a customer using email and password.</summary>
@@ -50,8 +49,8 @@ public sealed class AuthController : ControllerBase
         [FromBody] LoginRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await _authService.LoginAsync(request, cancellationToken);
-        return this.Match(result);
+        var result = await Sender.Send(new LoginCommand(request), cancellationToken);
+        return HandleResult(result);
     }
 
     /// <summary>
@@ -68,8 +67,8 @@ public sealed class AuthController : ControllerBase
         [FromBody] GoogleLoginRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await _authService.GoogleLoginAsync(request, cancellationToken);
-        return this.Match(result);
+        var result = await Sender.Send(new GoogleLoginCommand(request), cancellationToken);
+        return HandleResult(result);
     }
 
     /// <summary>Returns the profile of the currently authenticated user.</summary>
@@ -87,8 +86,8 @@ public sealed class AuthController : ControllerBase
         if (string.IsNullOrWhiteSpace(userId))
             return Unauthorized();
 
-        var result = await _authService.GetProfileAsync(userId, cancellationToken);
-        return this.Match(result);
+        var result = await Sender.Send(new GetProfileQuery(userId), cancellationToken);
+        return HandleResult(result);
     }
 
     /// <summary>Requests a password reset email.</summary>
@@ -105,14 +104,14 @@ public sealed class AuthController : ControllerBase
         [FromBody] ForgotPasswordRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await _authService.ForgotPasswordAsync(request, cancellationToken);
+        var result = await Sender.Send(new ForgotPasswordCommand(request), cancellationToken);
         
         if (result.IsSuccess)
         {
             return Ok(new { message = "If that email address is in our database, we will send you an email to reset your password." });
         }
 
-        return this.Match(result);
+        return HandleResult(result);
     }
 
     /// <summary>Resets a customer's password using a valid token.</summary>
@@ -126,14 +125,14 @@ public sealed class AuthController : ControllerBase
         [FromBody] ResetPasswordRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await _authService.ResetPasswordAsync(request, cancellationToken);
+        var result = await Sender.Send(new ResetPasswordCommand(request), cancellationToken);
         
         if (result.IsSuccess)
         {
             return Ok(new { message = "Password has been successfully reset." });
         }
 
-        return this.Match(result);
+        return HandleResult(result);
     }
 
     /// <summary>Refreshes the access token using a valid refresh token.</summary>
@@ -147,7 +146,7 @@ public sealed class AuthController : ControllerBase
         CancellationToken cancellationToken)
     {
         var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "0.0.0.0";
-        var result = await _authService.RefreshTokenAsync(request.RefreshToken, ipAddress, cancellationToken);
-        return this.Match(result);
+        var result = await Sender.Send(new RefreshTokenCommand(request.RefreshToken, ipAddress), cancellationToken);
+        return HandleResult(result);
     }
 }

@@ -38,14 +38,7 @@ public static class ApplicationServiceExtensions
         // Singleton: stateless pure service, no I/O or captured scope
         services.AddSingleton<ISlugService, SlugService>();
 
-        // Scoped: share DbContext within the HTTP request lifetime
-        services.AddScoped<ICategoryService,    CategoryService>();
-        services.AddScoped<IProductService,     ProductService>();
-        services.AddScoped<IProductImageService, ProductImageService>();
-        services.AddScoped<ICartService,        CartService>();
-        services.AddScoped<IOrderService,       OrderService>();
         services.AddScoped<IStockService,       StockService>();
-        services.AddScoped<IMoyasarWebhookService, MoyasarWebhookService>();
 
         // ── Authentication services ────────────────────────────────────────────
         // Registered here as interface stubs; implementations live in Infrastructure

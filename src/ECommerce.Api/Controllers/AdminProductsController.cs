@@ -1,7 +1,13 @@
 using ECommerce.Application.Contracts;
-using ECommerce.Application.Interfaces;
+using ECommerce.Application.Features.Products.Commands.CreateProduct;
+using ECommerce.Application.Features.Products.Commands.DeleteProduct;
+using ECommerce.Application.Features.Products.Commands.UpdateProduct;
+using ECommerce.Application.Features.Products.Queries.GetProductByIdForAdmin;
+using ECommerce.Application.Features.Products.Commands.UploadProductImage;
+using ECommerce.Application.Features.Products.Commands.DeleteProductImage;
+using ECommerce.Application.Features.Products.Commands.SetMainProductImage;
+using ECommerce.Application.Features.Products.Commands.ReorderProductImages;
 using ECommerce.Domain.Constants;
-using ECommerce.Api.Extensions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,17 +21,10 @@ namespace ECommerce.Api.Controllers;
 [Route("api/admin/products")]
 [Authorize(Roles = Roles.Admin)]
 [Produces("application/json")]
-public sealed class AdminProductsController : ControllerBase
+public sealed class AdminProductsController : BaseApiController
 {
-    private readonly IProductService      _productService;
-    private readonly IProductImageService _imageService;
-
-    public AdminProductsController(
-        IProductService      productService,
-        IProductImageService imageService)
+    public AdminProductsController()
     {
-        _productService = productService;
-        _imageService   = imageService;
     }
 
     // ── Product CRUD ──────────────────────────────────────────────────────────
@@ -40,8 +39,8 @@ public sealed class AdminProductsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken)
     {
-        var result = await _productService.GetByIdForAdminAsync(id, cancellationToken);
-        return this.Match(result);
+        var result = await Sender.Send(new GetProductByIdForAdminQuery(id), cancellationToken);
+        return HandleResult(result);
     }
 
     /// <summary>Creates a new product. Slug auto-generated from Name when not provided.</summary>
@@ -54,12 +53,16 @@ public sealed class AdminProductsController : ControllerBase
         [FromBody] CreateProductRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await _productService.CreateAsync(request, cancellationToken);
+        var result = await Sender.Send(new CreateProductCommand(request), cancellationToken);
 
-        return this.Match(result, product => 
-            CreatedAtAction(nameof(GetById), 
-                            new { id = product.Id }, 
-                            product));
+        if (result.IsSuccess)
+        {
+            return CreatedAtAction(nameof(GetById), 
+                                   new { id = result.Value.Id }, 
+                                   result.Value);
+        }
+
+        return HandleResult(result);
     }
 
     /// <summary>Updates an existing product by ID.</summary>
@@ -78,8 +81,8 @@ public sealed class AdminProductsController : ControllerBase
         [FromBody] UpdateProductRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await _productService.UpdateAsync(id, request, cancellationToken);
-        return this.Match(result);
+        var result = await Sender.Send(new UpdateProductCommand(id, request), cancellationToken);
+        return HandleResult(result);
     }
 
     /// <summary>
@@ -95,8 +98,8 @@ public sealed class AdminProductsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
-        var result = await _productService.DeleteAsync(id, cancellationToken);
-        return this.Match(result);
+        var result = await Sender.Send(new DeleteProductCommand(id), cancellationToken);
+        return HandleResult(result);
     }
 
     // ── Product Image Management ──────────────────────────────────────────────
@@ -123,12 +126,16 @@ public sealed class AdminProductsController : ControllerBase
         [FromForm] UploadProductImageRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await _imageService.UploadAsync(id, request, cancellationToken);
+        var result = await Sender.Send(new UploadProductImageCommand(id, request), cancellationToken);
 
-        return this.Match(result, image => 
-            CreatedAtAction(nameof(GetById), 
-                            new { id }, 
-                            image));
+        if (result.IsSuccess)
+        {
+            return CreatedAtAction(nameof(GetById), 
+                                   new { id }, 
+                                   result.Value);
+        }
+
+        return HandleResult(result);
     }
 
     /// <summary>Deletes a product image. Cloudinary asset is also removed (best-effort).</summary>
@@ -145,8 +152,8 @@ public sealed class AdminProductsController : ControllerBase
         Guid imageId,
         CancellationToken cancellationToken)
     {
-        var result = await _imageService.DeleteAsync(id, imageId, cancellationToken);
-        return this.Match(result);
+        var result = await Sender.Send(new DeleteProductImageCommand(id, imageId), cancellationToken);
+        return HandleResult(result);
     }
 
     /// <summary>Sets the specified image as the product's main (hero) image.</summary>
@@ -163,8 +170,8 @@ public sealed class AdminProductsController : ControllerBase
         Guid imageId,
         CancellationToken cancellationToken)
     {
-        var result = await _imageService.SetMainAsync(id, imageId, cancellationToken);
-        return this.Match(result);
+        var result = await Sender.Send(new SetMainProductImageCommand(id, imageId), cancellationToken);
+        return HandleResult(result);
     }
 
     /// <summary>
@@ -184,7 +191,7 @@ public sealed class AdminProductsController : ControllerBase
         [FromBody] ReorderProductImagesRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await _imageService.ReorderAsync(id, request, cancellationToken);
-        return this.Match(result);
+        var result = await Sender.Send(new ReorderProductImagesCommand(id, request), cancellationToken);
+        return HandleResult(result);
     }
 }

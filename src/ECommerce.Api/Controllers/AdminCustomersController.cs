@@ -1,5 +1,6 @@
 using ECommerce.Application.Contracts;
-using ECommerce.Application.Interfaces;
+using ECommerce.Application.Features.AdminCustomers.Queries.SearchCustomers;
+using ECommerce.Application.Features.AdminCustomers.Queries.GetCustomerDetails;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -8,15 +9,8 @@ namespace ECommerce.Api.Controllers;
 [ApiController]
 [Route("api/v1/admin/customers")]
 [Authorize(Policy = "AdminOnly")]
-public class AdminCustomersController : ControllerBase
+public class AdminCustomersController : BaseApiController
 {
-    private readonly ICustomerService _customerService;
-
-    public AdminCustomersController(ICustomerService customerService)
-    {
-        _customerService = customerService;
-    }
-
     [HttpGet]
     public async Task<IActionResult> GetCustomers(
         [FromQuery] string? search,
@@ -24,15 +18,15 @@ public class AdminCustomersController : ControllerBase
         [FromQuery] int pageSize = 10,
         CancellationToken cancellationToken = default)
     {
-        var result = await _customerService.SearchCustomersAsync(search, page, pageSize, cancellationToken);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(result.Error);
+        var result = await Sender.Send(new SearchCustomersQuery(search, page, pageSize), cancellationToken);
+        return HandleResult(result);
     }
 
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(CustomerDetailsResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetCustomer(string id, CancellationToken cancellationToken)
     {
-        var result = await _customerService.GetCustomerDetailsAsync(id, cancellationToken);
-        return result.IsSuccess ? Ok(result.Value) : NotFound(result.Error);
+        var result = await Sender.Send(new GetCustomerDetailsQuery(id), cancellationToken);
+        return HandleResult(result);
     }
 }

@@ -1,27 +1,21 @@
-using ECommerce.Api.Extensions;
 using ECommerce.Application.Contracts;
-using ECommerce.Application.Interfaces;
+using ECommerce.Application.Features.Webhooks.Commands.ProcessMoyasarWebhook;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ECommerce.Api.Controllers;
 
-[ApiController]
 [Route("api/webhooks")]
 [AllowAnonymous]
-[Produces("application/json")]
-public sealed class WebhooksController : ControllerBase
+public sealed class WebhooksController : BaseApiController
 {
-    private readonly IMoyasarWebhookService _webhookService;
     private readonly IConfiguration _configuration;
     private readonly ILogger<WebhooksController> _logger;
 
     public WebhooksController(
-        IMoyasarWebhookService webhookService,
         IConfiguration configuration,
         ILogger<WebhooksController> logger)
     {
-        _webhookService = webhookService;
         _configuration = configuration;
         _logger = logger;
     }
@@ -40,9 +34,8 @@ public sealed class WebhooksController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, new { Message = "Server configuration error." });
         }
 
-        var result = await _webhookService.ProcessWebhookAsync(payload, configuredSecret, cancellationToken);
+        var result = await Sender.Send(new ProcessMoyasarWebhookCommand(payload, configuredSecret), cancellationToken);
 
-        // Uses standard ApiControllerExtensions to return 200 OK or appropriate error codes
-        return this.Match(result);
+        return HandleResult(result);
     }
 }

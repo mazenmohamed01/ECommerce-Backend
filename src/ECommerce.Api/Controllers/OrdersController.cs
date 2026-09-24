@@ -1,5 +1,8 @@
 using ECommerce.Application.Contracts;
-using ECommerce.Application.Interfaces;
+using ECommerce.Application.Features.Orders.Commands.CheckoutOrder;
+using ECommerce.Application.Features.Orders.Commands.InitiateOrderPayment;
+using ECommerce.Application.Features.Orders.Queries.GetCustomerOrders;
+using ECommerce.Application.Features.Orders.Queries.GetOrderById;
 using ECommerce.Domain.Constants;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -8,28 +11,20 @@ using System.Security.Claims;
 
 namespace ECommerce.Api.Controllers;
 
-[ApiController]
 [Route("api/v1/orders")]
 [Authorize(Roles = Roles.Customer)]
-public sealed class OrdersController : ControllerBase
+public sealed class OrdersController : BaseApiController
 {
-    private readonly IOrderService _orderService;
-
-    public OrdersController(IOrderService orderService)
-    {
-        _orderService = orderService;
-    }
-
     [HttpPost("checkout")]
     [ProducesResponseType(typeof(OrderResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Checkout([FromBody] CreateOrderRequest request, CancellationToken cancellationToken)
     {
         var customerId = GetCustomerId();
-        var result = await _orderService.CheckoutAsync(customerId, request, cancellationToken);
+        var result = await Sender.Send(new CheckoutOrderCommand(customerId, request), cancellationToken);
         
         if (result.IsFailure)
-            return result.Error.Code == "Validation" ? BadRequest(result.Error) : StatusCode(500, result.Error);
+            return HandleResult(result);
 
         return CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value);
     }
@@ -39,9 +34,9 @@ public sealed class OrdersController : ControllerBase
     public async Task<IActionResult> GetMyOrders([FromQuery] PaginationRequest request, CancellationToken cancellationToken)
     {
         var customerId = GetCustomerId();
-        var result = await _orderService.GetCustomerOrdersAsync(customerId, request, cancellationToken);
+        var result = await Sender.Send(new GetCustomerOrdersQuery(customerId, request), cancellationToken);
         
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(result.Error);
+        return HandleResult(result);
     }
 
     [HttpGet("{id:guid}")]
@@ -50,16 +45,9 @@ public sealed class OrdersController : ControllerBase
     public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken)
     {
         var customerId = GetCustomerId();
-        var result = await _orderService.GetByIdAsync(id, customerId, cancellationToken);
+        var result = await Sender.Send(new GetOrderByIdQuery(id, customerId), cancellationToken);
         
-        if (result.IsFailure)
-        {
-            if (result.Error.Code.Contains("NotFound")) return NotFound(result.Error);
-            if (result.Error.Code.Contains("Forbidden")) return Forbid();
-            return BadRequest(result.Error);
-        }
-
-        return Ok(result.Value);
+        return HandleResult(result);
     }
 
     [HttpPost("{id:guid}/pay")]
@@ -71,16 +59,9 @@ public sealed class OrdersController : ControllerBase
     public async Task<IActionResult> Pay(Guid id, CancellationToken cancellationToken)
     {
         var customerId = GetCustomerId();
-        var result = await _orderService.InitiatePaymentAsync(id, customerId, cancellationToken);
+        var result = await Sender.Send(new InitiateOrderPaymentCommand(id, customerId), cancellationToken);
         
-        if (result.IsFailure)
-        {
-            if (result.Error.Code.Contains("NotFound")) return NotFound(result.Error);
-            if (result.Error.Code.Contains("Denied") || result.Error.Code.Contains("Unauthorized")) return Forbid();
-            return BadRequest(result.Error);
-        }
-
-        return Ok(result.Value);
+        return HandleResult(result);
     }
 
     private string GetCustomerId() => User.FindFirstValue(ClaimTypes.NameIdentifier)!;
