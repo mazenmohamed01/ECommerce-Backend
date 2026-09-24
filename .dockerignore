@@ -1,0 +1,15 @@
+.dockerignore
+.env
+.env.local
+.git
+.gitignore
+.vs
+.vscode
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+bin/
+obj/
+logs/
+*.log

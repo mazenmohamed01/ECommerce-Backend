@@ -1,0 +1,113 @@
+services:
+  ecommerce-api:
+    image: ecommerce-api
+    container_name: ecommerce-api
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    
+    # Uncomment to use .env file for secrets instead of hardcoding here
+    # env_file:
+    #   - .env
+
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Host=ecommerce-db;Port=5432;Database=ECommerceDb;Username=postgres;Password=720461
+      - ConnectionStrings__RedisConnection=ecommerce-redis:6379
+    
+    depends_on:
+      ecommerce-db:
+        condition: service_healthy
+      ecommerce-redis:
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+    networks:
+      - root_default
+      - api_network
+    
+    volumes:
+      # Data protection keys for ASP.NET to keep JWT/Auth cookies valid across container restarts
+      - ecommerce_dp_keys:/app/DataProtectionKeys
+
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=root_default"
+      # Domain for API
+      - "traefik.http.routers.ecommerce-api.rule=Host(`api.ojlinker.com.sa`)"
+      # HTTPS
+      - "traefik.http.routers.ecommerce-api.entrypoints=websecure"
+      - "traefik.http.routers.ecommerce-api.tls=true"
+      - "traefik.http.routers.ecommerce-api.tls.certresolver=letsencrypt"
+      # Internal Port
+      - "traefik.http.services.ecommerce-api.loadbalancer.server.port=8080"
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  ecommerce-db:
+    image: postgres:15-alpine
+    container_name: ecommerce-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ECommerceDb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 720461
+    volumes:
+      - ecommerce-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ECommerceDb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - api_network
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  ecommerce-redis:
+    image: redis:7-alpine
+    container_name: ecommerce-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - ecommerce-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - api_network
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  root_default:
+    external: true
+  api_network:
+    driver: bridge
+
+volumes:
+  ecommerce-db-data:
+    driver: local
+  ecommerce_dp_keys:
+    driver: local
+  ecommerce-redis-data:
+    driver: local
